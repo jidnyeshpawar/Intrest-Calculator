@@ -1,0 +1,195 @@
+import tkinter as tk
+from tkinter import ttk, messagebox
+from tkcalendar import DateEntry
+from ttkthemes import ThemedTk
+from datetime import datetime
+from math import pow
+
+# Theme mappings (safe themes only)
+THEMES = {
+    "Business": "equilux",
+    "Casual": "arc",
+    "Anime Girl Pink": "radiance",
+    "Dark": "equilux",
+    "Light": "plastik"
+}
+
+def calculate_interest():
+    try:
+        principal_text = principal_entry.get().strip()
+        rate_text = rate_entry.get().strip()
+
+        if not principal_text or not rate_text:
+            messagebox.showerror("Input Error", "Enter both Principal and Rate.")
+            return
+
+        principal = float(principal_text)
+        rate = float(rate_text) / 100
+
+        rate_unit = rate_type.get()
+        start = start_date.get_date()
+        end = datetime.today().date() if end_today.get() else end_date.get_date()
+
+        if end < start:
+            messagebox.showerror("Date Error", "End date must be after start date.")
+            return
+
+        days = (end - start).days
+        years = days / 365.0
+        months = days / 30.0
+        weeks = days / 7.0
+
+        interest_type_selected = interest_choice.get()
+
+        if interest_type_selected == "Simple":
+            if rate_unit == "Annual":
+                interest = principal * rate * years
+            elif rate_unit == "Monthly":
+                interest = principal * rate * months
+            elif rate_unit == "Weekly":
+                interest = principal * rate * weeks
+            elif rate_unit == "Daily":
+                interest = principal * rate * days
+            else:
+                messagebox.showerror("Rate Type Error", "Invalid rate type.")
+                return
+            total = principal + interest
+
+        elif interest_type_selected == "Compound":
+            times_per_year = int(compound_choice.get())
+            total = principal * pow((1 + rate / times_per_year), times_per_year * years)
+            interest = total - principal
+
+        elif interest_type_selected == "Monthly":
+            total = principal * pow((1 + rate / 12), months)
+            interest = total - principal
+
+        else:
+            messagebox.showerror("Selection Error", "Please select a valid interest type.")
+            return
+
+        result_label.config(
+            text=f"Days Passed: {days}\n"
+                 f"Interest Earned: ₹{interest:.2f}\n"
+                 f"Total Amount: ₹{total:.2f}"
+        )
+
+    except Exception as e:
+        messagebox.showerror("Unexpected Error", str(e))
+
+def toggle_end_date():
+    end_date.configure(state="disabled" if end_today.get() else "normal")
+
+def clear_fields():
+    principal_entry.delete(0, tk.END)
+    rate_entry.delete(0, tk.END)
+    end_today.set(True)
+    toggle_end_date()
+    interest_choice.set("Simple")
+    rate_type.set("Annual")
+    compound_choice.set("1")
+    compound_freq.configure(state="disabled")
+    result_label.config(text="")
+
+def update_compound_state(event=None):
+    if interest_choice.get() == "Compound":
+        compound_freq.configure(state="readonly")
+        rate_type_menu.configure(state="disabled")
+    else:
+        compound_freq.configure(state="disabled")
+        rate_type_menu.configure(state="readonly")
+
+def apply_theme(event=None):
+    selected = theme_var.get()
+    if selected in THEMES:
+        try:
+            root.set_theme(THEMES[selected])
+        except Exception as e:
+            messagebox.showerror("Theme Error", f"Theme failed: {e}")
+
+# --- GUI Setup ---
+root = ThemedTk(theme="arc")
+root.title("Interest Calculator")
+root.geometry("500x600")
+root.minsize(480, 540)
+root.columnconfigure(0, weight=1)
+
+notebook = ttk.Notebook(root)
+notebook.pack(expand=True, fill='both')
+
+# --- Calculator Tab ---
+calc_tab = ttk.Frame(notebook)
+notebook.add(calc_tab, text="Calculator")
+
+calc_frame = ttk.Frame(calc_tab, padding=10)
+calc_frame.pack(expand=True, fill='both')
+
+principal_entry = ttk.Entry(calc_frame)
+rate_entry = ttk.Entry(calc_frame)
+
+ttk.Label(calc_frame, text="Principal Amount (₹):").pack(pady=5)
+principal_entry.pack(fill='x')
+
+ttk.Label(calc_frame, text="Interest Rate (%):").pack(pady=5)
+rate_entry.pack(fill='x')
+
+# Rate Type
+ttk.Label(calc_frame, text="Rate Type:").pack(pady=5)
+rate_type = tk.StringVar(value="Annual")
+rate_type_menu = ttk.Combobox(calc_frame, textvariable=rate_type, state="readonly",
+                              values=["Annual", "Monthly", "Weekly", "Daily"])
+rate_type_menu.pack(fill='x')
+
+# Start Date
+ttk.Label(calc_frame, text="Start Date:").pack(pady=5)
+start_date = DateEntry(calc_frame, selectmode='day', date_pattern='dd-mm-yyyy')
+start_date.pack()
+
+# End Date
+end_today = tk.BooleanVar(value=True)
+ttk.Checkbutton(calc_frame, text="Use Today's Date as End Date", variable=end_today, command=toggle_end_date).pack()
+
+ttk.Label(calc_frame, text="Or choose End Date:").pack()
+end_date = DateEntry(calc_frame, selectmode='day', date_pattern='dd-mm-yyyy', state="disabled")
+end_date.pack()
+
+# Interest Type
+ttk.Label(calc_frame, text="Interest Type:").pack(pady=5)
+interest_choice = tk.StringVar(value="Simple")
+interest_type_menu = ttk.Combobox(calc_frame, textvariable=interest_choice, state="readonly",
+                                  values=["Simple", "Compound", "Monthly"])
+interest_type_menu.pack(fill='x')
+interest_type_menu.bind("<<ComboboxSelected>>", update_compound_state)
+
+# Compound Frequency
+ttk.Label(calc_frame, text="Compoundings per year (if compound):").pack(pady=5)
+compound_choice = tk.StringVar(value="1")
+compound_freq = ttk.Combobox(calc_frame, textvariable=compound_choice, state="disabled",
+                             values=["1", "2", "4", "12"])
+compound_freq.pack(fill='x')
+
+# Buttons
+ttk.Button(calc_frame, text="Calculate", command=calculate_interest).pack(pady=10)
+ttk.Button(calc_frame, text="Clear", command=clear_fields).pack()
+
+# Result
+result_label = ttk.Label(calc_frame, text="", font=("Helvetica", 11), foreground="green", justify="center")
+result_label.pack(pady=15)
+
+# --- Settings Tab ---
+settings_tab = ttk.Frame(notebook)
+notebook.add(settings_tab, text="Settings")
+
+settings_frame = ttk.Frame(settings_tab, padding=10)
+settings_frame.pack(expand=True, fill='both')
+
+# Theme switcher
+ttk.Label(settings_frame, text="Select Theme:").pack(pady=10)
+theme_var = tk.StringVar(value="Casual")
+theme_menu = ttk.Combobox(settings_frame, textvariable=theme_var, state="readonly",
+                          values=list(THEMES.keys()))
+theme_menu.pack(pady=5)
+theme_menu.bind("<<ComboboxSelected>>", apply_theme)
+
+# Run the GUI
+root.mainloop()
